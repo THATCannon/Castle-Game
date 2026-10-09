@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Castle Defense: Flying Dragons & Hero Shards</title>
+  <style>
+    :root {
+      --bg-color: #12121e;
+      --panel-bg: #1e1e2d;
+      --card-bg: #28283d;
+      --accent-color: #ffd700;
+      --shard-color: #00e5ff;
+      --text-color: #e0e0e0;
+      --castle-color: #5c5c8a;
+      --castle-border: #3d3d5c;
+      --castle-glow: rgba(0,0,0,0.3);
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    h1 { margin: 5px 0; color: var(--accent-color); font-size: 1.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+
+    .top-bar {
+      display: flex; gap: 12px; background: var(--panel-bg); padding: 8px 16px;
+      border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      margin-bottom: 10px; font-size: 0.95rem; font-weight: bold; flex-wrap: wrap; justify-content: center; align-items: center;
+    }
+    .gold-display { color: var(--accent-color); }
+    .shard-display { color: var(--shard-color); }
+
+    .action-group { display: flex; gap: 6px; align-items: center; }
+    .code-box { display: flex; gap: 4px; background: #12121e; padding: 4px 6px; border-radius: 6px; border: 1px solid #3d3d5c; }
+    .code-box input { background: transparent; border: none; color: #fff; font-size: 0.8rem; font-weight: bold; outline: none; width: 100px; }
+    .code-box button { background: #7b1fa2; color: #fff; border: none; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; cursor: pointer; }
+    .code-box button:hover { background: #8e24aa; }
+
+    .save-btn { background: #0288d1; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; cursor: pointer; }
+    .save-btn:hover { background: #039be5; }
+    .reset-btn { background: #d32f2f; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; cursor: pointer; }
+    .reset-btn:hover { background: #e53935; }
+
+    /* Battlefield */
+    .battlefield {
+      width: 100%; max-width: 1100px; height: 180px;
+      background: #1a1a24; border: 2px solid #33334d;
+      border-radius: 8px; position: relative;
+      margin-bottom: 10px; overflow: hidden;
+    }
+
+    .thunder-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.85); z-index: 50; pointer-events: none;
+      opacity: 0; transition: opacity 0.1s ease-out;
+    }
+
+    .castle {
+      position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+      width: 90px; height: 95px; background-color: var(--castle-color);
+      border: 3px solid var(--castle-border); border-radius: 12px 12px 2px 2px;
+      z-index: 5; box-shadow: 0 -4px 15px var(--castle-glow);
+    }
+    .castle::after {
+      content: ''; position: absolute; top: -10px; left: 0; width: 100%; height: 10px;
+      background: repeating-linear-gradient(90deg, var(--castle-color), var(--castle-color) 12px, transparent 12px, transparent 20px);
+    }
+    .castle.royal::before {
+      content: '👑'; position: absolute; top: -32px; left: 50%; transform: translateX(-50%);
+      font-size: 22px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+
+    .castle-health {
+      position: absolute; top: 5px; left: 10px; width: 70px; height: 6px;
+      background: #333; border-radius: 3px; z-index: 6;
+    }
+    #castle-hp-bar { width: 100%; height: 100%; background: #2e7d32; border-radius: 3px; transition: width 0.3s; }
+
+    /* Units & Animations */
+    .unit { position: absolute; width: 22px; height: 22px; border-radius: 6px; z-index: 10; font-size: 14px; text-align: center; line-height: 22px; color: white; border: 1px solid rgba(0,0,0,0.5); font-weight: bold; }
+    .attacker { background-color: #d32f2f; border-radius: 50%; }
+    .enemy-goblin::after { content: '👹'; font-size: 12px; }
+    .enemy-troll::after { content: '🧌'; font-size: 12px; }
+
+    /* Ground Defender Animation */
+    .defender { animation: floatAround 4s infinite ease-in-out; }
+    @keyframes floatAround {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-4px, 2px); }
+      50% { transform: translate(4px, -2px); }
+      75% { transform: translate(2px, 3px); }
+    }
+
+    /* Flying Dragon Sky Animation */
+    .flying-defender {
+      animation: flySky 8s ease-in-out infinite alternate;
+      z-index: 20 !important;
+    }
+    @keyframes flySky {
+      0% { transform: translate(-30px, 0px) scale(1); }
+      50% { transform: translate(40px, -20px) scale(1.1); }
+      100% { transform: translate(-20px, 10px) scale(0.95); }
+    }
+    
+    .look-militia { background: #8d6e63; }
+    .look-spearman { background: #455a64; }
+    .look-archer { background: #43a047; }
+    .look-ranger { background: #2e7d32; }
+    .look-crossbow { background: #546e7a; }
+    .look-berserker { background: #d84315; }
+    .look-knight { background: #5c6bc0; }
+    .look-gryphon { background: #f57c00; }
+    .look-phalanx { background: #78909c; }
+    .look-paladin { background: #ffd54f; color: #111; }
+    .look-archmage { background: #9575cd; }
+    .look-archangel { background: #e0e0e0; color: #111; border: 2px solid #ffd700; }
+    .look-rider { background: #ab47bc; border: 2px solid #ffd700; width: 26px; height: 26px; line-height: 26px; font-size: 16px; }
+    .look-drogan { background: #b71c1c; border: 2px solid #ffd700; width: 30px; height: 30px; line-height: 30px; font-size: 20px; }
+    .look-hero { background: #f50057; border: 2px solid #ffd700; width: 26px; height: 26px; line-height: 26px; font-size: 16px; }
+    .look-griffin { background: #fb8c00; }
+    .look-phoenix { background: #f4511e; width: 26px; height: 26px; line-height: 26px; font-size: 16px; }
+    .look-dragon { background: #b71c1c; width: 28px; height: 28px; line-height: 28px; font-size: 18px; }
+    .look-leviathan { background: #0277bd; width: 28px; height: 28px; line-height: 28px; font-size: 18px; }
+
+    /* Layout */
+    .game-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 1200px; }
+    .panel { background: var(--panel-bg); padding: 12px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    h2 { border-bottom: 2px solid #3d3d5c; padding-bottom: 6px; margin-top: 0; font-size: 1.05rem; }
+    .scroll-list { max-height: 220px; overflow-y: auto; padding-right: 5px; }
+
+    .card {
+      background: var(--card-bg); border-radius: 6px; padding: 8px 10px;
+      margin-bottom: 8px; display: flex; justify-content: space-between;
+      align-items: center; border-left: 5px solid #888;
+    }
+    
+    .rarity-common { border-left-color: #a0a0a0; }
+    .rarity-rare { border-left-color: #4b8df8; }
+    .rarity-epic { border-left-color: #a335ee; }
+    .rarity-legendary { border-left-color: #ff8000; }
+    .rarity-hero { border-left-color: #f50057; }
+    .rarity-ancient { border-left-color: #e91e63; }
+    .building-card { border-left-color: #ffd700; }
+    .tech-card { border-left-color: #00bcd4; }
+    .city-card { border-left-color: #e91e63; }
+    .ability-card { border-left-color: #ffeb3b; }
+
+    .tag-hero { color: #f50057; font-weight: bold; }
+    .card-info h3 { margin: 0 0 3px 0; font-size: 0.9rem; }
+    .card-stats { font-size: 0.78rem; color: #aaa; }
+
+    button.btn {
+      background: #2e7d32; color: white; border: none; padding: 5px 10px;
+      border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s; min-width: 80px; font-size: 0.8rem;
+    }
+    button.btn:hover { background: #388e3c; }
+    button.btn:disabled { background: #555; cursor: not-allowed; opacity: 0.6; }
+
+    .shard-btn { background: #00838f !important; }
+    .shard-btn:hover { background: #00acc1 !important; }
+    .attack-btn { background: #c62828 !important; }
+    .attack-btn:hover { background: #e53935 !important; }
+    .cast-btn { background: #7b1fa2 !important; }
+    .cast-btn:hover { background: #8e24aa !important; }
+
+    .locked-notice {
+      padding: 10px; text-align: center; color: #ff8a80; background: rgba(255,0,0,0.1); border-radius: 6px; font-weight: bold; font-size: 0.85rem; margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🏰 Castle Defense: Flying Dragons & Shard Heroes</h1>
+
+  <div class="top-bar">
+    <div>Gold: <span id="gold" class="gold-display">100</span> 🪙</div>
+    <div>Shards: <span id="shards" class="shard-display">10</span> 💎</div>
+    <div>Income: +<span id="income">2</span>/sec</div>
+    <div>Power: ⚔️ <span id="power">0</span></div>
+    <div>HP: <span id="hp-text">1000/1000</span></div>
+
+    <div class="action-group">
+      <div class="code-box">
+        <input type="text" id="code-input" placeholder="Enter Code">
+        <button onclick="redeemCode()">Claim</button>
+      </div>
+      <button class="save-btn" onclick="saveGame(true)">💾 Save</button>
+      <button class="reset-btn" onclick="resetSave()">🗑️ Reset</button>
+    </div>
+  </div>
+
+  <div id="battlefield" class="battlefield">
+    <div id="thunder-overlay" class="thunder-overlay"></div>
+    <div id="castle" class="castle">
+      <div class="castle-health"><div id="castle-hp-bar"></div></div>
+    </div>
+  </div>
+
+  <div class="game-container">
+    <!-- Active Abilities Panel -->
+    <div class="panel">
+      <h2>⚡ Spells & Abilities</h2>
+      <div id="ability-list" class="scroll-list"></div>
+    </div>
+
+    <!-- World Map Panel -->
+    <div class="panel">
+      <h2>🗺️ World Map (Attacks)</h2>
+      <div id="city-list" class="scroll-list"></div>
+    </div>
+
+    <!-- Hero Class Panel (Uses Shards) -->
+    <div class="panel">
+      <h2>💎 Hero Class (Requires Shards)</h2>
+      <div id="hero-list" class="scroll-list"></div>
+    </div>
+
+    <!-- Troop Recruitment Panel -->
+    <div class="panel">
+      <h2>🛡️ Soldiers & Troops</h2>
+      <div id="armory-lock-msg" class="locked-notice">
+        🔒 Build an <b>Armory</b> to unlock troops!
+      </div>
+      <div id="shop-list" class="scroll-list" style="display: none;"></div>
+    </div>
+
+    <!-- Buildings Panel -->
+    <div class="panel">
+      <h2>🔨 Buildings</h2>
+      <div id="building-list" class="scroll-list"></div>
+    </div>
+
+    <!-- Tech Tree Panel -->
+    <div class="panel">
+      <h2>🔬 Tech Tree</h2>
+      <div id="lab-lock-msg" class="locked-notice">
+        🔒 Build a <b>Research Lab</b> to unlock tech upgrades!
+      </div>
+      <div id="tech-list" class="scroll-list" style="display: none;"></div>
+    </div>
+  </div>
+
+  <script>
+    let gold = 100;
+    let shards = 10; // New Premium Shards Currency
+    let baseIncome = 2;
+    let castleMaxHp = 1000;
+    let castleHp = 1000;
+    let isGameOver = false;
+    let redeemedCodes = [];
+    let isRoyalTheme = false;
+
+    let powerMultiplier = 1.0;
+    let incomeMultiplier = 1.0;
+
+    const abilities = [
+      { id: 'thunder', name: 'Thunder Strike', icon: '⚡', cost: 150, cooldown: 12, currentCd: 0, desc: 'Destroys all active attackers.' },
+      { id: 'earthquake', name: 'Earthquake', icon: '🌋', cost: 300, cooldown: 20, currentCd: 0, desc: 'Shakes the battlefield to wipe enemies.' },
+      { id: 'heal', name: 'Divine Repair', icon: '✨', cost: 250, cooldown: 15, currentCd: 0, desc: 'Restores +300 Castle HP.' }
+    ];
+
+    const cities = [
+      { id: 'goblin_camp', name: 'Goblin Outpost', icon: '🏕️', reqPower: 25, rewardGold: 250, rewardShards: 5, conquered: false },
+      { id: 'bandit_fort', name: 'Bandit Hideout', icon: '🛖', reqPower: 120, rewardGold: 1200, rewardShards: 15, conquered: false },
+      { id: 'orc_citadel', name: 'Orc Citadel', icon: '🌋', reqPower: 500, rewardGold: 5000, rewardShards: 35, conquered: false },
+      { id: 'vampire_spire', name: 'Vampire Spire', icon: '🏰', reqPower: 1200, rewardGold: 15000, rewardShards: 75, conquered: false },
+      { id: 'shadow_keep', name: 'Shadow Hold', icon: '🕋', reqPower: 3000, rewardGold: 40000, rewardShards: 150, conquered: false },
+      { id: 'dragon_spire', name: 'Dragon Spire', icon: '🐉', reqPower: 8000, rewardGold: 120000, rewardShards: 300, conquered: false },
+      { id: 'titan_citadel', name: 'Titan Fortress', icon: '🗿', reqPower: 20000, rewardGold: 350000, rewardShards: 600, conquered: false },
+      { id: 'celestial_realm', name: 'Celestial Realm', icon: '✨', reqPower: 50000, rewardGold: 1000000, rewardShards: 1500, conquered: false }
+    ];
+
+    // Heroes Cost SHARDS Now
+    const heroes = [
+      { id: 'valen', name: 'Commander Valen', rarity: 'hero', costShards: 25, power: 400, income: 100, count: 0, isFlyer: false, look: 'look-hero', icon: '⚔️👑' },
+      { id: 'lyra', name: 'Archmage Lyra', rarity: 'hero', costShards: 80, power: 1100, income: 280, count: 0, isFlyer: false, look: 'look-hero', icon: '🔮✨' },
+      { id: 'arthur', name: 'High King Arthur', rarity: 'hero', costShards: 250, power: 4000, income: 900, count: 0, isFlyer: false, look: 'look-hero', icon: '🦁👑' }
+    ];
+
+    const techTree = [
+      { id: 'weapons', name: 'Weapon Forging', icon: '⚔️', cost: 150, rank: 0, desc: '+15% Power to all units per rank.' },
+      { id: 'economy', name: 'Trade Networks', icon: '📜', cost: 200, rank: 0, desc: '+15% Income from all sources per rank.' },
+      { id: 'stonework', name: 'Fortified Walls', icon: '🧱', cost: 250, rank: 0, desc: '+200 Max Castle HP & repairs castle.' }
+    ];
+
+    const buildings = [
+      { id: 'armory', name: 'Armory', icon: '🏛️', cost: 100, income: 0, count: 0, desc: 'Unlocks troop recruiting.' },
+      { id: 'lab', name: 'Research Lab', icon: '🧪', cost: 150, income: 0, count: 0, desc: 'Unlocks Research & Tech upgrades.' },
+      { id: 'gold_mine', name: 'Gold Mine', icon: '⛏️', cost: 50, income: 5, count: 0, desc: 'Extracts gold continuously.' },
+      { id: 'market', name: 'Trade Market', icon: '🏪', cost: 200, income: 18, count: 0, desc: 'Generates trade revenue.' },
+      { id: 'bank', name: 'Royal Bank', icon: '🏦', cost: 800, income: 65, count: 0, desc: 'High capacity financial building.' }
+    ];
+
+    // Troop definitions with Flyer distinction (isFlyer = true)
+    const units = [
+      { id: 'militia', name: 'Peasant Guard', rarity: 'common', cost: 15, power: 1, income: 1, count: 0, isFlyer: false, look: 'look-militia', icon: '✊' },
+      { id: 'spearman', name: 'Town Spearman', rarity: 'common', cost: 35, power: 3, income: 2, count: 0, isFlyer: false, look: 'look-spearman', icon: '🔱' },
+      { id: 'archer', name: 'Shortbow Archer', rarity: 'common', cost: 60, power: 5, income: 3, count: 0, isFlyer: false, look: 'look-archer', icon: '🏹' },
+      { id: 'ranger', name: 'Elven Ranger', rarity: 'common', cost: 95, power: 8, income: 4, count: 0, isFlyer: false, look: 'look-ranger', icon: '🧝' },
+      { id: 'crossbow', name: 'Heavy Crossbowman', rarity: 'rare', cost: 140, power: 12, income: 6, count: 0, isFlyer: false, look: 'look-crossbow', icon: '🎯' },
+      { id: 'berserker', name: 'Dwarven Berserker', rarity: 'rare', cost: 180, power: 15, income: 8, count: 0, isFlyer: false, look: 'look-berserker', icon: '🪓' },
+      { id: 'knight', name: 'Armored Knight', rarity: 'rare', cost: 220, power: 18, income: 9, count: 0, isFlyer: false, look: 'look-knight', icon: '🛡️' },
+      { id: 'phalanx', name: 'Royal Phalanx', rarity: 'rare', cost: 380, power: 32, income: 14, count: 0, isFlyer: false, look: 'look-phalanx', icon: '🏯' },
+      { id: 'paladin', name: 'Holy Paladin', rarity: 'epic', cost: 800, power: 75, income: 25, count: 0, isFlyer: false, look: 'look-paladin', icon: '☀️' },
+      { id: 'gryphon', name: 'Gryphon Knight', rarity: 'epic', cost: 1200, power: 110, income: 35, count: 0, isFlyer: true, look: 'look-gryphon', icon: '🦅⚔️' },
+      { id: 'archmage', name: 'Elemental Archmage', rarity: 'epic', cost: 1500, power: 140, income: 45, count: 0, isFlyer: false, look: 'look-archmage', icon: '🔮' },
+      { id: 'griffin', name: 'War Griffin', rarity: 'epic', cost: 2500, power: 230, income: 70, count: 0, isFlyer: true, look: 'look-griffin', icon: '🦅' },
+      { id: 'phoenix', name: 'Solar Phoenix', rarity: 'legendary', cost: 5000, power: 480, income: 130, count: 0, isFlyer: true, look: 'look-phoenix', icon: '🔥' },
+      { id: 'dragon', name: 'Inferno Dragon', rarity: 'legendary', cost: 9000, power: 900, income: 240, count: 0, isFlyer: true, look: 'look-dragon', icon: '🐉' },
+      { id: 'archangel', name: 'Seraph Archangel', rarity: 'legendary', cost: 13000, power: 1350, income: 320, count: 0, isFlyer: true, look: 'look-archangel', icon: '👼' },
+      { id: 'rider', name: 'The Rider', rarity: 'legendary', cost: 12000, power: 1200, income: 180, count: 0, isFlyer: true, look: 'look-rider', icon: '🧙‍♂️🐉' },
+      { id: 'drogan', name: 'Drogan the Ancient', rarity: 'ancient', cost: 25000, power: 2500, income: 500, count: 0, isFlyer: true, look: 'look-drogan', icon: '🐲' },
+      { id: 'leviathan', name: 'Abyssal Leviathan', rarity: 'legendary', cost: 16000, power: 1700, income: 420, count: 0, isFlyer: true, look: 'look-leviathan', icon: '🐋' }
+    ];
+
+    const SAVE_KEY = 'CastleDefense_SaveData_v4';
+
+    function saveGame(showNotice = false) {
+      if (isGameOver) return;
+      const saveData = {
+        gold, shards, castleHp, castleMaxHp, powerMultiplier, incomeMultiplier, redeemedCodes, isRoyalTheme,
+        cities: cities.map(c => ({ id: c.id, conquered: c.conquered })),
+        buildings: buildings.map(b => ({ id: b.id, count: b.count, cost: b.cost })),
+        techTree: techTree.map(t => ({ id: t.id, rank: t.rank, cost: t.cost })),
+        units: units.map(u => ({ id: u.id, count: u.count, cost: u.cost })),
+        heroes: heroes.map(h => ({ id: h.id, count: h.count, costShards: h.costShards }))
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+      if (showNotice) alert('💾 Game Saved Successfully!');
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return;
+
+      try {
+        const data = JSON.parse(raw);
+        gold = data.gold ?? 100;
+        shards = data.shards ?? 10;
+        castleHp = data.castleHp ?? 1000;
+        castleMaxHp = data.castleMaxHp ?? 1000;
+        powerMultiplier = data.powerMultiplier ?? 1.0;
+        incomeMultiplier = data.incomeMultiplier ?? 1.0;
+        redeemedCodes = data.redeemedCodes ?? [];
+        isRoyalTheme = data.isRoyalTheme ?? false;
+
+        if (data.cities) data.cities.forEach(sc => { const c = cities.find(x => x.id === sc.id); if (c) c.conquered = sc.conquered; });
+        if (data.buildings) data.buildings.forEach(sb => { const b = buildings.find(x => x.id === sb.id); if (b) { b.count = sb.count; b.cost = sb.cost; } });
+        if (data.techTree) data.techTree.forEach(st => { const t = techTree.find(x => x.id === st.id); if (t) { t.rank = st.rank; t.cost = st.cost; } });
+        if (data.units) data.units.forEach(su => { const u = units.find(x => x.id === su.id); if (u) { u.count = su.count; u.cost = su.cost; } });
+        if (data.heroes) data.heroes.forEach(sh => { const h = heroes.find(x => x.id === sh.id); if (h) { h.count = sh.count; h.costShards = sh.costShards; } });
+
+        if (isRoyalTheme) applyRoyalTheme();
+
+        const armory = buildings.find(b => b.id === 'armory');
+        if (armory && armory.count > 0) {
+          document.getElementById('armory-lock-msg').style.display = 'none';
+          document.getElementById('shop-list').style.display = 'block';
+        }
+        const lab = buildings.find(b => b.id === 'lab');
+        if (lab && lab.count > 0) {
+          document.getElementById('lab-lock-msg').style.display = 'none';
+          document.getElementById('tech-list').style.display = 'block';
+        }
+
+        units.forEach(u => { for (let i = 0; i < u.count; i++) visualizeDefender(u); });
+        heroes.forEach(h => { for (let i = 0; i < h.count; i++) visualizeDefender(h); });
+
+      } catch (e) { console.error("Failed to load save file:", e); }
+    }
+
+    function resetSave() {
+      if (confirm('⚠️ Reset all progress?')) {
+        localStorage.removeItem(SAVE_KEY);
+        location.reload();
+      }
+    }
+
+    function applyRoyalTheme() {
+      isRoyalTheme = true;
+      document.documentElement.style.setProperty('--castle-color', '#ffd700');
+      document.documentElement.style.setProperty('--castle-border', '#ffab00');
+      document.documentElement.style.setProperty('--castle-glow', 'rgba(255, 215, 0, 0.6)');
+      document.getElementById('castle').classList.add('royal');
+    }
+
+    function renderAbilities() {
+      const container = document.getElementById('ability-list');
+      container.innerHTML = '';
+      abilities.forEach(a => {
+        const card = document.createElement('div');
+        card.className = 'card ability-card';
+        card.innerHTML = `
+          <div class="card-info">
+            <h3>${a.icon} ${a.name}</h3>
+            <div class="card-stats">${a.desc}</div>
+          </div>
+          <button class="btn cast-btn" id="btn-a-${a.id}" onclick="useAbility('${a.id}')" ${a.currentCd > 0 || gold < a.cost ? 'disabled' : ''}>
+            ${a.currentCd > 0 ? a.currentCd + 's' : a.cost + ' 🪙'}
+          </button>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function useAbility(abilityId) {
+      if (isGameOver) return;
+      const ab = abilities.find(a => a.id === abilityId);
+      if (ab && ab.currentCd === 0 && gold >= ab.cost) {
+        gold -= ab.cost;
+        ab.currentCd = ab.cooldown;
+
+        if (abilityId === 'thunder') {
+          const bf = document.getElementById('battlefield');
+          const overlay = document.getElementById('thunder-overlay');
+          overlay.style.opacity = '1';
+          setTimeout(() => { overlay.style.opacity = '0'; }, 150);
+          document.querySelectorAll('.attacker').forEach(el => bf.removeChild(el));
+        } else if (abilityId === 'earthquake') {
+          const bf = document.getElementById('battlefield');
+          bf.classList.add('earthquake-shake');
+          setTimeout(() => { bf.classList.remove('earthquake-shake'); }, 800);
+          document.querySelectorAll('.attacker').forEach(el => bf.removeChild(el));
+        } else if (abilityId === 'heal') {
+          castleHp = Math.min(castleMaxHp, castleHp + 300);
+        }
+
+        renderAbilities(); updateUI(); saveGame();
+      }
+    }
+
+    function redeemCode() {
+      const input = document.getElementById('code-input').value.trim();
+      if (!input) return;
+
+      if (input === 'Idefend') {
+        if (redeemedCodes.includes('Idefend')) return alert('⚠️ Code "Idefend" already claimed!');
+        gold += 15000;
+        shards += 50;
+        redeemedCodes.push('Idefend');
+        const riderUnit = units.find(u => u.id === 'rider');
+        if (riderUnit) { riderUnit.count++; visualizeDefender(riderUnit); }
+        alert('🎉 Code Claimed!\n- 🪙 15,000 Gold\n- 💎 50 Shards\n- 🧙‍♂️🐉 1x The Rider');
+        document.getElementById('code-input').value = '';
+        renderShop(); updateUI(); saveGame();
+      } 
+      else if (input === 'TheOneTrueHero') {
+        if (redeemedCodes.includes('TheOneTrueHero')) return alert('⚠️ Code "TheOneTrueHero" already claimed!');
+        shards += 150;
+        redeemedCodes.push('TheOneTrueHero');
+        const droganUnit = units.find(u => u.id === 'drogan');
+        if (droganUnit) { droganUnit.count++; visualizeDefender(droganUnit); }
+        applyRoyalTheme();
+        alert('👑 THE ONE TRUE HERO ARRIVES!\n- 💎 150 Shards\n- 🐲 1x Drogan the Ancient\n- 🏰 Golden Royal Castle!');
+        document.getElementById('code-input').value = '';
+        renderShop(); updateUI(); saveGame();
+      } else { alert('❌ Invalid Code!'); }
+    }
+
+    function renderCities() {
+      const cityContainer = document.getElementById('city-list');
+      cityContainer.innerHTML = '';
+      cities.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'card city-card';
+        card.innerHTML = `
+          <div class="card-info">
+            <h3>${c.icon} ${c.name} ${c.conquered ? '👑' : ''}</h3>
+            <div class="card-stats">Req: ⚔️ ${c.reqPower.toLocaleString()} | +${c.rewardGold.toLocaleString()} 🪙 & +${c.rewardShards} 💎</div>
+          </div>
+          <button class="btn attack-btn" id="btn-c-${c.id}" onclick="attackCity('${c.id}')" ${c.conquered ? 'disabled' : ''}>
+            ${c.conquered ? 'Claimed' : 'Attack'}
+          </button>
+        `;
+        cityContainer.appendChild(card);
+      });
+    }
+
+    function renderHeroes() {
+      const heroContainer = document.getElementById('hero-list');
+      heroContainer.innerHTML = '';
+      heroes.forEach(h => {
+        const card = document.createElement('div');
+        card.className = 'card rarity-hero';
+        card.innerHTML = `
+          <div class="card-info">
+            <h3>${h.icon} ${h.name} (${h.count})</h3>
+            <div class="card-stats">Pwr: ⚔️ ${Math.floor(h.power * powerMultiplier)} | Inc: +${Math.floor(h.income * incomeMultiplier)}/s</div>
+          </div>
+          <button class="btn shard-btn" id="btn-h-${h.id}" onclick="buyHero('${h.id}')">${h.costShards} 💎</button>
+        `;
+        heroContainer.appendChild(card);
+      });
+    }
+
+    function attackCity(cityId) {
+      if (isGameOver) return;
+      const c = cities.find(x => x.id === cityId);
+      let currentPower = getCurrentPower();
+      if (c && !c.conquered && currentPower >= c.reqPower) {
+        c.conquered = true;
+        gold += c.rewardGold;
+        shards += c.rewardShards;
+        alert(`⚔️ Victory! Conquered ${c.name} for ${c.rewardGold.toLocaleString()} Gold and ${c.rewardShards} Shards!`);
+        renderCities(); updateUI(); saveGame();
+      }
+    }
+
+    function renderBuildings() {
+      const bContainer = document.getElementById('building-list');
+      bContainer.innerHTML = '';
+      buildings.forEach(b => {
+        const card = document.createElement('div');
+        card.className = 'card building-card';
+        card.innerHTML = `
+          <div class="card-info">
+            <h3>${b.icon} ${b.name} (${b.count})</h3>
+            <div class="card-stats">${b.desc}</div>
+          </div>
+          <button class="btn" id="btn-b-${b.id}" onclick="buyBuilding('${b.id}')">${b.cost.toLocaleString()} 🪙</button>
+        `;
+        bContainer.appendChild(card);
+      });
+    }
+
+    function renderTech() {
+      const techContainer = document.getElementById('tech-list');
+      techContainer.innerHTML = '';
+      techTree.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'card tech-card';
+        card.innerHTML = `
+          <div class="card-info">
+            <h3>${t.icon} ${t.name} (Rank ${t.rank})</h3>
+            <div class="card-stats">${t.desc}</div>
+          </div>
+          <button class="btn" id="btn-t-${t.id}" onclick="researchTech('${t.id}')">${t.cost.toLocaleString()} 🪙</button>
+        `;
+        techContainer.appendChild(card);
+      });
+    }
+
+    function renderShop() {
+      const shopContainer = document.getElementById('shop-list');
+      shopContainer.innerHTML = '';
+      units.forEach(unit => {
+        const card = document.createElement('div');
+        card.className = `card rarity-${unit.rarity}`;
+        card.innerHTML = `
+          <div class="card-info">
+            <h3>${unit.icon} ${unit.name} <span class="tag-${unit.rarity}">[${unit.rarity.toUpperCase()}]</span></h3>
+            <div class="card-stats">Pwr: ⚔️ ${Math.floor(unit.power * powerMultiplier)} | Inc: +${Math.floor(unit.income * incomeMultiplier)}/s</div>
+          </div>
+          <button class="btn" id="btn-${unit.id}" onclick="buyUnit('${unit.id}')">${unit.cost.toLocaleString()} 🪙</button>
+        `;
+        shopContainer.appendChild(card);
+      });
+    }
+
+    function buyHero(heroId) {
+      if (isGameOver) return;
+      const hero = heroes.find(h => h.id === heroId);
+      if (hero && shards >= hero.costShards) {
+        shards -= hero.costShards;
+        hero.count++;
+        hero.costShards = Math.floor(hero.costShards * 1.35);
+        updateUI(); visualizeDefender(hero); saveGame();
+      }
+    }
+
+    function buyBuilding(bId) {
+      if (isGameOver) return;
+      const b = buildings.find(x => x.id === bId);
+      if (b && gold >= b.cost) {
+        gold -= b.cost;
+        b.count++;
+        b.cost = Math.floor(b.cost * 1.30);
+        if (bId === 'armory' && b.count === 1) {
+          document.getElementById('armory-lock-msg').style.display = 'none';
+          document.getElementById('shop-list').style.display = 'block';
+        }
+        if (bId === 'lab' && b.count === 1) {
+          document.getElementById('lab-lock-msg').style.display = 'none';
+          document.getElementById('tech-list').style.display = 'block';
+        }
+        updateUI(); saveGame();
+      }
+    }
+
+    function researchTech(techId) {
+      if (isGameOver) return;
+      const t = techTree.find(x => x.id === techId);
+      if (t && gold >= t.cost) {
+        gold -= t.cost;
+        t.rank++;
+        t.cost = Math.floor(t.cost * 1.45);
+        if (techId === 'weapons') powerMultiplier += 0.15;
+        if (techId === 'economy') incomeMultiplier += 0.15;
+        if (techId === 'stonework') { castleMaxHp += 200; castleHp = castleMaxHp; }
+        renderShop(); renderHeroes(); updateUI(); saveGame();
+      }
+    }
+
+    function buyUnit(unitId) {
+      if (isGameOver) return;
+      const unit = units.find(u => u.id === unitId);
+      if (unit && gold >= unit.cost) {
+        gold -= unit.cost;
+        unit.count++;
+        unit.cost = Math.floor(unit.cost * 1.20);
+        updateUI(); visualizeDefender(unit); saveGame();
+      }
+    }
+
+    function getCurrentPower() {
+      let rawPower = 0;
+      units.forEach(u => { rawPower += u.count * u.power; });
+      heroes.forEach(h => { rawPower += h.count * h.power; });
+      return Math.floor(rawPower * powerMultiplier);
+    }
+
+    function updateUI() {
+      if (isGameOver) return;
+      let rawIncome = baseIncome;
+      buildings.forEach(b => { rawIncome += b.count * b.income; });
+      units.forEach(u => { rawIncome += u.count * u.income; });
+      heroes.forEach(h => { rawIncome += h.count * h.income; });
+
+      let totalIncome = Math.floor(rawIncome * incomeMultiplier);
+      let totalPower = getCurrentPower();
+
+      document.getElementById('gold').innerText = Math.floor(gold).toLocaleString();
+      document.getElementById('shards').innerText = shards.toLocaleString();
+      document.getElementById('income').innerText = totalIncome.toLocaleString();
+      document.getElementById('power').innerText = totalPower.toLocaleString();
+      document.getElementById('hp-text').innerText = `${Math.floor(castleHp)}/${castleMaxHp}`;
+
+      cities.forEach(c => {
+        const btn = document.getElementById(`btn-c-${c.id}`);
+        if (btn && !c.conquered) { btn.disabled = totalPower < c.reqPower; }
+      });
+      heroes.forEach(h => {
+        const btn = document.getElementById(`btn-h-${h.id}`);
+        if (btn) { btn.innerText = `${h.costShards.toLocaleString()} 💎`; btn.disabled = shards < h.costShards; }
+      });
+      buildings.forEach(b => {
+        const btn = document.getElementById(`btn-b-${b.id}`);
+        if (btn) { btn.innerText = `${b.cost.toLocaleString()} 🪙`; btn.disabled = gold < b.cost; }
+      });
+      techTree.forEach(t => {
+        const btn = document.getElementById(`btn-t-${t.id}`);
+        if (btn) { btn.innerText = `${t.cost.toLocaleString()} 🪙`; btn.disabled = gold < t.cost; }
+      });
+      units.forEach(unit => {
+        const btn = document.getElementById(`btn-${unit.id}`);
+        if (btn) { btn.innerText = `${unit.cost.toLocaleString()} 🪙`; btn.disabled = gold < unit.cost; }
+      });
+
+      const hpPercent = (castleHp / castleMaxHp) * 100;
+      document.getElementById('castle-hp-bar').style.width = hpPercent + '%';
+      if (hpPercent < 30) document.getElementById('castle-hp-bar').style.background = '#b71c1c';
+      else if (hpPercent < 60) document.getElementById('castle-hp-bar').style.background = '#f9a825';
+      else document.getElementById('castle-hp-bar').style.background = '#2e7d32';
+    }
+
+    // Dynamic Visualizer (Differentiates Flying Dragons from Ground Troops)
+    function visualizeDefender(unitType) {
+      const bf = document.getElementById('battlefield');
+      const troop = document.createElement('div');
+      
+      const isFlyer = unitType.isFlyer;
+      troop.className = `unit ${isFlyer ? 'flying-defender' : 'defender'} ${unitType.look}`;
+      troop.innerHTML = unitType.icon;
+      
+      const castleX = bf.offsetWidth / 2;
+      
+      if (isFlyer) {
+        // Flying Dragons move around in the upper sky above the castle
+        troop.style.left = (castleX - 100 + Math.random() * 200) + 'px';
+        troop.style.top = (Math.random() * 50 + 10) + 'px'; 
+      } else {
+        // Ground defenders stay near the castle base
+        troop.style.left = (castleX - 25 + Math.random() * 50) + 'px';
+        troop.style.bottom = (Math.random() * 35 + 5) + 'px';
+      }
+      
+      bf.appendChild(troop);
+    }
+
+    function spawnEnemy() {
+      if (isGameOver) return;
+      const bf = document.getElementById('battlefield');
+      const enemy = document.createElement('div');
+      const isGoblin = Math.random() > 0.3;
+
+      enemy.className = `unit attacker ${isGoblin ? 'enemy-goblin' : 'enemy-troll'}`;
+      const startLeft = Math.random() > 0.5;
+      enemy.style.left = (startLeft ? -20 : (bf.offsetWidth + 20)) + 'px';
+      enemy.style.bottom = (Math.random() * 30 + 5) + 'px';
+      bf.appendChild(enemy);
+
+      const targetX = bf.offsetWidth / 2 - 10;
+      const speed = isGoblin ? 1.5 : 0.8;
+
+      function walk() {
+        if (isGameOver) { if(enemy.parentNode) bf.removeChild(enemy); return; }
+        const currentX = parseFloat(enemy.style.left);
+        const direction = currentX < targetX ? 1 : -1;
+        enemy.style.left = (currentX + speed * direction) + 'px';
+
+        if (Math.abs(currentX - targetX) < 10) {
+          dealCastleDamage(isGoblin ? 5 : 50);
+          if (enemy.parentNode) bf.removeChild(enemy);
+          return;
+        }
+        requestAnimationFrame(walk);
+      }
+      walk();
+    }
+
+    function dealCastleDamage(dmg) {
+      castleHp -= dmg;
+      if (castleHp <= 0) { castleHp = 0; gameOver(); }
+      updateUI();
+    }
+
+    function gameOver() {
+      isGameOver = true;
+      document.body.innerHTML += '<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); color:#d32f2f; font-size:3.5rem; display:flex; justify-content:center; align-items:center; z-index:1000; font-weight:bold; flex-direction:column;">🏰 CASTLE FALLEN<div style="font-size:1.5rem; color:#fff; margin-top:1rem;">Refresh to try again</div></div>';
+    }
+
+    setInterval(() => {
+      let rawIncome = baseIncome;
+      buildings.forEach(b => { rawIncome += b.count * b.income; });
+      units.forEach(u => { rawIncome += u.count * u.income; });
+      heroes.forEach(h => { rawIncome += h.count * h.income; });
+      gold += Math.floor(rawIncome * incomeMultiplier);
+
+      abilities.forEach(a => { if (a.currentCd > 0) a.currentCd--; });
+
+      renderAbilities();
+      updateUI();
+    }, 1000);
+
+    setInterval(() => { saveGame(false); }, 5000);
+
+    function scheduleSpawn() {
+      spawnEnemy();
+      let currentRate = Math.max(800, 3500 - (units.reduce((s,u)=>s+u.count,0) * 10)); 
+      setTimeout(scheduleSpawn, currentRate + Math.random() * 2000);
+    }
+
+    loadGame();
+    renderAbilities();
+    renderCities();
+    renderHeroes();
+    renderBuildings();
+    renderTech();
+    renderShop();
+    updateUI();
+    scheduleSpawn();
+  </script>
+</body>
+</html>
